@@ -44,43 +44,45 @@ exports.linkUserNodes = functions.firestore
         const coordId = context.params.coordId;
 
         const snapData = snapshot.data()
-        let user1Coord = {
+        let coord1 = {
             latitude: snapData.latitude,
             longitude: snapData.longitude
         }
-        coordinatesCollection
+        return coordinatesCollection
             .get()
             .then((usersSnap) => {
                 let users = []
+                // push each user to the users array if it's not the
+                // user that invoked the event
                 usersSnap.forEach(doc => {
-                    if (doc.id != userId) {
-                        let userData = doc.data()
-                        userData['userId'] = doc.id
-                        users.push(userData)
-                    }
+                    let userData = doc.data()
+                    userData['id'] = doc.id
+                    users.push(userData)
                 })
                 return users;
             })
             .then((users) => {
-                let links = {}
+                // update the links for each user based on the distance
+                console.log('user array length: ' + users.length);
+                let promises = []
                 for (const user of users) {
-                    let user2Coord = {
+                    let coord2 = {
                         latitude: user.latitude,
                         longitude: user.longitude
                     }
-                    if (helperFunctions.isConnected(user1Coord, user2Coord)) {
-                        linksCollection.doc(userId).add({
-                            dist: helperFunctions.haversineDist(user1Coord, user2Coord)
-                        })
-                            .then(reference => {
-                                return response.status(201).send({ reference: reference });
-                            })
-                            .catch(reason => {
-                                return response.status(500).send({
-                                    error: 'could not add link to the database'
-                                })
-                            })
+                    if (helperFunctions.isConnected(coord1, coord2)) {
+                        promises.push(linksCollection.doc(userId)
+                            .collection('neighbors')
+                            .add({ dist: helperFunctions.haversineDist(coord1, coord2) }))
+                        promises.push(linksCollection
+                            .doc(user.id).collection('neighbors')
+                            .add({ dist: helperFunctions.haversineDist(coord2, coord1) }))
                     }
                 }
+                return Promise.all(promises)
+            })
+            .then((updatesRef) => console.log('update successful: ' + updatesRef))
+            .catch((reason) => {
+                console.log('reason: ' + reason);
             })
     })
