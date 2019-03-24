@@ -22,7 +22,7 @@ exports.addCoordinate = functions.https.onRequest((request, response) => {
 
     coordinatesCollection.doc(userId).collection('latest').add({
         coord: new admin.firestore.GeoPoint(latitude, longitude),
-        timestamp: new Date(timestamp).toISOString(),
+        timestamp: admin.firestore.Timestamp.fromDate(new Date(timestamp))
     })
         .then(ref => ref.get())
         .then(doc => {
