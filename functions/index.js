@@ -1,27 +1,37 @@
-const functions = require('firebase-functions');
+const functions = require('firebase-functions')
+const moment = require('moment')
 
-const admin = require('firebase-admin');
-admin.initializeApp(functions.config().firebase);
-var db = admin.firestore();
-var coordinatesCollection = db.collection('coordinates');
+const admin = require('firebase-admin')
+admin.initializeApp(functions.config().firebase)
+
+
+var db = admin.firestore()
+var coordinatesCollection = db.collection('coordinates')
 
 exports.addCoordinate = functions.https.onRequest((request, response) => {
-    const userId = request.body.userId;
-    const timestamp = request.body.timestamp;
-    const latitude = request.body.latitude;
-    const longitude = request.body.longitude;
+    if (request.method !== 'POST') {
+        response.status(400).send({ error: 'only POST request allowed' })
+        return;
+    }
+
+    const userId = request.body.userId
+    const timestamp = request.body.timestamp
+    const latitude = request.body.latitude
+    const longitude = request.body.longitude
 
 
     coordinatesCollection.doc(userId).collection('latest').add({
         coord: new admin.firestore.GeoPoint(latitude, longitude),
-        timestamp: Date.parse(timestamp),
+        timestamp: new Date(timestamp).toISOString(),
     })
-        .then(reference => {
-            return response.status(201).send({ reference: reference });
+        .then(ref => ref.get())
+        .then(doc => {
+            return response.status(201).send({ data: doc.data() })
         })
         .catch(reason => {
             return response.status(500).send({
-                error: 'could not add coordinate to the database'
+                error: 'could not add coordinate to the database: ' + reason
             })
         })
-});
+})
+
